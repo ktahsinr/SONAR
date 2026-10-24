@@ -1,0 +1,43 @@
+# Track A: ultrasound-specific checkpoint slot (USFM / EchoCare / etc.)
+# Set model.timm_name to the timm architecture matching your checkpoint and
+# model.checkpoint_path to the local state-dict file.
+run_name: track_a_ultrasound_ckpt
+seed: 42
+device: auto
+
+data:
+  metadata_csv: data/metadata.csv
+  image_dir: data/images
+  classes_json: artifacts/classes.json
+  domain: all
+  image_size: 224
+  crop_box: null
+  hflip: false
+  num_workers: 2
+
+model:
+  backbone: ultrasound_local
+  timm_name: vit_base_patch16_224        # architecture of the local checkpoint
+  pretrained: false                      # weights come from checkpoint_path
+  mode: finetune
+  checkpoint_path: /path/to/usfm_or_echocare_checkpoint.pt
+
+train:
+  epochs: 30
+  batch_size: 16
+  lr_head: 1.0e-3
+  lr_backbone: 1.0e-5
+  weight_decay: 0.01
+  early_stopping_patience: 7
+  amp: true
+  class_weighted_loss: true
+
+eval:
+  batch_size: 32
+  checkpoint: null
+
+export:
+  format: torchscript
+
+output:
+  dir: results

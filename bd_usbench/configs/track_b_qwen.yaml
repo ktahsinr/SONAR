@@ -1,0 +1,21 @@
+# Track B: Qwen2.5-VL zero-shot (4-bit). Swap model_name for a newer
+# Qwen-VL or MedGemma checkpoint without code changes.
+run_name: track_b_qwen_zeroshot
+seed: 42
+device: auto
+
+data:
+  metadata_csv: data/metadata.csv
+  image_dir: data/images
+  classes_json: artifacts/classes.json
+  domain: all
+  crop_box: null
+
+model:
+  type: qwen
+  model_name: Qwen/Qwen2.5-VL-7B-Instruct
+  load_in_4bit: true
+  adapter_path: null         # zero-shot: no adapter
+
+output:
+  dir: results

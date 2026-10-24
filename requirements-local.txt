@@ -1,0 +1,15 @@
+# Unpinned minimal set for running tests / CPU prediction on a laptop with a
+# newer Python (e.g. 3.14) where the pinned Kaggle versions have no wheels.
+# The VLM extras (transformers/peft/bitsandbytes/open_clip) are not needed to
+# run the test suite or still-image prediction.
+torch
+torchvision
+timm
+numpy
+pandas
+scikit-learn
+opencv-python-headless
+matplotlib
+Pillow
+PyYAML
+pytest

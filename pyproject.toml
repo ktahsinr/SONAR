@@ -1,0 +1,55 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bd-usbench"
+version = "0.1.0"
+description = "BD-USBench: organ classification on B-mode ultrasound stills with supervised and VLM baselines (training + still-image evaluation phase)"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = [
+    "torch",
+    "torchvision",
+    "timm",
+    "numpy",
+    "pandas",
+    "scikit-learn",
+    "opencv-python-headless",
+    "matplotlib",
+    "Pillow",
+    "PyYAML",
+]
+
+[project.optional-dependencies]
+vlm = [
+    "transformers",
+    "accelerate",
+    "peft",
+    "open_clip_torch",
+    "qwen-vl-utils",
+    "sentencepiece",
+]
+onnx = ["onnx", "onnxruntime"]
+test = ["pytest"]
+
+[project.scripts]
+bdus-data-report = "bd_usbench.scripts.data_report:main"
+bdus-train = "bd_usbench.scripts.train:main"
+bdus-train-lora = "bd_usbench.scripts.train_lora:main"
+bdus-evaluate = "bd_usbench.scripts.evaluate:main"
+bdus-compare = "bd_usbench.scripts.compare:main"
+bdus-predict = "bd_usbench.scripts.predict:main"
+bdus-export = "bd_usbench.scripts.export_model:main"
+bdus-make-synthetic = "bd_usbench.scripts.make_synthetic:main"
+
+[tool.setuptools.packages.find]
+include = ["bd_usbench*"]
+
+[tool.setuptools.package-data]
+bd_usbench = ["configs/*.yaml"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

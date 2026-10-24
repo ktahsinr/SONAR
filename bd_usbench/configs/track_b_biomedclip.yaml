@@ -1,0 +1,19 @@
+# Track B: BiomedCLIP zero-shot (falls back to CLIP ViT-B-32 if unavailable)
+run_name: track_b_biomedclip
+seed: 42
+device: auto
+
+data:
+  metadata_csv: data/metadata.csv
+  image_dir: data/images
+  classes_json: artifacts/classes.json
+  domain: all
+  image_size: 224      # unused: CLIP has its own preprocessing
+  crop_box: null
+
+model:
+  type: clip
+  clip_model: biomedclip   # or an open_clip model name like ViT-B-32
+
+output:
+  dir: results

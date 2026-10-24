@@ -1,0 +1,41 @@
+# Tiny CPU smoke config used with the synthetic dataset (make_synthetic.py).
+# resnet18 with pretrained=false means no network access is needed.
+run_name: smoke_resnet18
+seed: 42
+device: cpu
+
+data:
+  metadata_csv: data_synthetic/metadata.csv
+  image_dir: data_synthetic/images
+  classes_json: data_synthetic/classes.json
+  domain: all
+  image_size: 64
+  crop_box: null
+  hflip: false
+  num_workers: 0
+
+model:
+  backbone: resnet18
+  pretrained: false
+  mode: finetune
+  checkpoint_path: null
+
+train:
+  epochs: 3
+  batch_size: 8
+  lr_head: 1.0e-2
+  lr_backbone: 1.0e-3
+  weight_decay: 0.0
+  early_stopping_patience: 3
+  amp: false
+  class_weighted_loss: true
+
+eval:
+  batch_size: 8
+  checkpoint: null
+
+export:
+  format: torchscript
+
+output:
+  dir: results

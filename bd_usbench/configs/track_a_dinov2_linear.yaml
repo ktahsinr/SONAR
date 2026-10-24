@@ -1,0 +1,40 @@
+# Track A: DINOv2 ViT-S/14 linear probe (frozen features)
+run_name: track_a_dinov2_linear
+seed: 42
+device: auto
+
+data:
+  metadata_csv: data/metadata.csv
+  image_dir: data/images
+  classes_json: artifacts/classes.json   # shared across ALL tracks
+  domain: all                            # fetal | adult | all
+  image_size: 224
+  crop_box: null                         # [x, y, width, height] to remove machine UI
+  hflip: false                           # laterality matters — keep off
+  num_workers: 2
+
+model:
+  backbone: dinov2_vits14
+  pretrained: true
+  mode: linear_probe                     # linear_probe | finetune
+  checkpoint_path: null
+
+train:
+  epochs: 40
+  batch_size: 32
+  lr_head: 1.0e-3
+  lr_backbone: 1.0e-5                    # unused in linear_probe mode
+  weight_decay: 0.01
+  early_stopping_patience: 8
+  amp: true
+  class_weighted_loss: true
+
+eval:
+  batch_size: 32
+  checkpoint: null                       # default: results/<run_name>/checkpoints/best.pt
+
+export:
+  format: torchscript                    # torchscript | onnx | none
+
+output:
+  dir: results

@@ -1,0 +1,40 @@
+# Track A: ConvNeXt-Tiny full fine-tune (lower backbone LR)
+run_name: track_a_convnext_finetune
+seed: 42
+device: auto
+
+data:
+  metadata_csv: data/metadata.csv
+  image_dir: data/images
+  classes_json: artifacts/classes.json
+  domain: all
+  image_size: 224
+  crop_box: null
+  hflip: false
+  num_workers: 2
+
+model:
+  backbone: convnext_tiny
+  pretrained: true
+  mode: finetune
+  checkpoint_path: null
+
+train:
+  epochs: 30
+  batch_size: 32
+  lr_head: 1.0e-3
+  lr_backbone: 1.0e-5
+  weight_decay: 0.01
+  early_stopping_patience: 7
+  amp: true
+  class_weighted_loss: true
+
+eval:
+  batch_size: 32
+  checkpoint: null
+
+export:
+  format: torchscript
+
+output:
+  dir: results

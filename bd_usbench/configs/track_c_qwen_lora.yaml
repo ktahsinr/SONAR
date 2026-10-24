@@ -1,0 +1,35 @@
+# Track C: LoRA fine-tune of Qwen2.5-VL-7B (4-bit base + grad checkpointing,
+# fits in 16 GB on Kaggle T4/P100). Only the adapter is saved.
+run_name: track_c_qwen_lora
+seed: 42
+device: auto
+
+data:
+  metadata_csv: data/metadata.csv
+  image_dir: data/images
+  classes_json: artifacts/classes.json
+  domain: all
+  crop_box: null
+
+model:
+  type: qwen
+  model_name: Qwen/Qwen2.5-VL-7B-Instruct
+  load_in_4bit: true
+  vision:
+    min_pixels: 50176        # 224*224 — lower bound for the vision tokenizer
+    max_pixels: 409600       # 640*640 — caps VRAM for high-res images
+
+lora:
+  r: 16
+  alpha: 32
+  dropout: 0.05
+  target_modules: [q_proj, k_proj, v_proj, o_proj]
+
+train:
+  epochs: 3
+  lr: 1.0e-4
+  weight_decay: 0.0
+  grad_accum_steps: 8        # effective batch size 8 with per-step batch 1
+
+output:
+  dir: results
