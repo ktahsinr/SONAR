@@ -31,6 +31,7 @@ def _vlm_pairs(cfg: dict, classes: list[str], split: str) -> list[tuple[Path, st
         split=split,
         domain=cfg["data"].get("domain", "all"),
         classes=classes,
+        min_train_images=int(cfg["data"].get("min_train_images", 5)),
     )
     return [
         (ds.image_path(i), organ_display_name(classes[ds.label_index(i)]))

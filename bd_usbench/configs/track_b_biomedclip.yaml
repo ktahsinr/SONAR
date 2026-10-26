@@ -7,6 +7,7 @@ data:
   metadata_csv: data/metadata.csv
   image_dir: data/images
   classes_json: artifacts/classes.json
+  min_train_images: 5    # collapse classes with fewer train images into "other"
   domain: all
   image_size: 224      # unused: CLIP has its own preprocessing
   crop_box: null

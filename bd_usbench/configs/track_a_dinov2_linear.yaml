@@ -7,6 +7,7 @@ data:
   metadata_csv: data/metadata.csv
   image_dir: data/images
   classes_json: artifacts/classes.json   # shared across ALL tracks
+  min_train_images: 5    # collapse classes with fewer train images into "other"
   domain: all                            # fetal | adult | all
   image_size: 224
   crop_box: null                         # [x, y, width, height] to remove machine UI

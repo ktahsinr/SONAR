@@ -44,6 +44,7 @@ def _dataset(cfg: dict, classes: list[str], split: str, domain: str, with_transf
         classes=classes,
         transform=transform,
         crop_box=data_cfg.get("crop_box"),
+        min_train_images=int(data_cfg.get("min_train_images", 5)),
     )
 
 

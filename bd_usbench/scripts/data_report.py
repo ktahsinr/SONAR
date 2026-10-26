@@ -25,13 +25,20 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--image-dir", default=None, help="Image folder (enables missing-file check)")
     parser.add_argument("--min-train", type=int, default=30,
                         help="Flag classes with fewer train images than this (default 30)")
+    parser.add_argument("--min-train-images", type=int, default=5,
+                        help="Report classes that training collapses into 'other' "
+                             "below this many train images (default 5, matching "
+                             "the data.min_train_images config default)")
     parser.add_argument("--out", default=None, help="Also write the report to this file")
     args = parser.parse_args(argv)
 
-    report = build_report(args.metadata, image_dir=args.image_dir, min_train=args.min_train)
+    report = build_report(args.metadata, image_dir=args.image_dir, min_train=args.min_train,
+                          min_train_images=args.min_train_images)
     print(report)
     if args.out:
-        Path(args.out).write_text(report + "\n", encoding="utf-8")
+        out = Path(args.out)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(report + "\n", encoding="utf-8")
         logger.info("Report written to %s", args.out)
 
     # Non-zero exit on split leakage so CI / notebooks fail loudly.

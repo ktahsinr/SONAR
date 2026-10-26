@@ -31,12 +31,17 @@ logger = get_logger(__name__)
 def resolve_class_list(cfg: dict) -> list[str]:
     """Load classes.json if present, otherwise build from the CSV and save it.
 
-    Guarantees every track uses the identical class-index mapping.
+    Guarantees every track uses the identical class-index mapping. Classes with
+    fewer than ``data.min_train_images`` train images (default 5) are collapsed
+    into "other" before the list is saved.
     """
     classes_json = Path(cfg["data"]["classes_json"])
     if classes_json.exists():
         return load_classes(classes_json)
-    classes = build_class_list(load_metadata(cfg["data"]["metadata_csv"]))
+    classes = build_class_list(
+        load_metadata(cfg["data"]["metadata_csv"]),
+        min_train_images=int(cfg["data"].get("min_train_images", 5)),
+    )
     save_classes(classes, classes_json)
     return classes
 
@@ -53,6 +58,7 @@ def build_dataloaders(
         domain=data_cfg.get("domain", "all"),
         classes=classes,
         crop_box=data_cfg.get("crop_box"),
+        min_train_images=int(data_cfg.get("min_train_images", 5)),
     )
     train_ds = UltrasoundDataset(
         split="train",

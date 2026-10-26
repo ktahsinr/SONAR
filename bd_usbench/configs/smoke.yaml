@@ -8,6 +8,7 @@ data:
   metadata_csv: data_synthetic/metadata.csv
   image_dir: data_synthetic/images
   classes_json: data_synthetic/classes.json
+  min_train_images: 5    # collapse classes with fewer train images into "other"
   domain: all
   image_size: 64
   crop_box: null
