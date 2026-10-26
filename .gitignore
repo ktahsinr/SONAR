@@ -2,10 +2,11 @@ __pycache__/
 *.pyc
 .venv/
 .pytest_cache/
-results/
-data/
-data_synthetic/
-artifacts/
+# Anchored to the repo root so bd_usbench/data/ (the Python package) stays tracked.
+/results/
+/data/
+/data_synthetic/
+/artifacts/
 *.egg-info/
 .ipynb_checkpoints/
 .DS_Store
