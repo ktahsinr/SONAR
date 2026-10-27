@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import numpy as np
+import pytest
 
 from bd_usbench.eval.metrics import (
     compute_classification_metrics,
@@ -31,6 +32,27 @@ def test_unparsed_counts_as_error():
     assert metrics["n_unparsed"] == 1
     assert metrics["accuracy"] < 1.0
     assert metrics["per_class"]["heart"]["recall"] == 0.0
+
+
+def test_macro_f1_ignores_zero_support_classes():
+    # "liver" (index 2) never appears in y_true, so it must not drag macro_f1
+    # down, while macro_f1_all_classes still includes its F1=0 entry.
+    y_true = np.array([0, 0, 1, 1])
+    y_pred = np.array([0, 1, 1, 1])
+    metrics = compute_classification_metrics(y_true, y_pred, CLASSES)
+
+    assert metrics["n_classes_present"] == 2
+    assert metrics["macro_f1"] > metrics["macro_f1_all_classes"]
+    # All-classes macro is the present-classes macro diluted by one F1=0 term.
+    assert metrics["macro_f1_all_classes"] == pytest.approx(metrics["macro_f1"] * 2 / 3)
+    assert metrics["per_class"]["liver"]["support"] == 0
+
+
+def test_macro_f1_equal_when_all_classes_present():
+    y = np.array([0, 1, 2, 0, 1, 2])
+    metrics = compute_classification_metrics(y, y, CLASSES)
+    assert metrics["n_classes_present"] == 3
+    assert metrics["macro_f1"] == metrics["macro_f1_all_classes"]
 
 
 def test_ece_bounds():

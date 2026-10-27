@@ -199,7 +199,9 @@ def _write_summary_md(metrics: dict, path: Path) -> None:
         f"({metrics['split']}, domain={metrics['domain']})",
         "",
         f"- Accuracy: **{metrics['accuracy']:.4f}**",
-        f"- Macro-F1: **{metrics['macro_f1']:.4f}**",
+        f"- Macro-F1 (classes present in split): **{metrics['macro_f1']:.4f}** "
+        f"({metrics['n_classes_present']} classes present)",
+        f"- Macro-F1 (all classes): {metrics['macro_f1_all_classes']:.4f}",
         f"- ECE: {metrics['ece'] if metrics['ece'] is not None else 'n/a (no probabilities)'}",
         f"- Mean latency: {metrics['latency']['mean_ms']} ms/image on {metrics['device']}",
         f"- Samples: {metrics['n_samples']} (unparsed: {metrics['n_unparsed']})",

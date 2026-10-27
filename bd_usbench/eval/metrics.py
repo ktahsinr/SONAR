@@ -19,12 +19,22 @@ from sklearn.metrics import confusion_matrix, f1_score, precision_recall_fscore_
 def compute_classification_metrics(
     y_true: np.ndarray, y_pred: np.ndarray, classes: list[str]
 ) -> dict:
-    """Accuracy, macro-F1 and per-class precision/recall/F1/support."""
+    """Accuracy, macro-F1 and per-class precision/recall/F1/support.
+
+    ``macro_f1`` averages only over classes present in ``y_true`` for this
+    split, so classes with zero test support don't drag it down with F1=0
+    entries; ``macro_f1_all_classes`` keeps the average over every class in
+    ``classes`` for comparison.
+    """
     y_true = np.asarray(y_true)
     y_pred = np.asarray(y_pred)
     labels = list(range(len(classes)))
+    present_labels = sorted(set(int(v) for v in y_true))
     accuracy = float((y_true == y_pred).mean()) if len(y_true) else 0.0
     macro_f1 = float(
+        f1_score(y_true, y_pred, labels=present_labels, average="macro", zero_division=0)
+    ) if present_labels else 0.0
+    macro_f1_all_classes = float(
         f1_score(y_true, y_pred, labels=labels, average="macro", zero_division=0)
     )
     precision, recall, f1, support = precision_recall_fscore_support(
@@ -42,6 +52,8 @@ def compute_classification_metrics(
     return {
         "accuracy": accuracy,
         "macro_f1": macro_f1,
+        "macro_f1_all_classes": macro_f1_all_classes,
+        "n_classes_present": len(present_labels),
         "per_class": per_class,
         "n_samples": int(len(y_true)),
         "n_unparsed": int((y_pred == -1).sum()),
