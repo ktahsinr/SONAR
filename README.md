@@ -96,6 +96,9 @@ python -m bd_usbench.scripts.evaluate --track a \
 
 # Collect everything into one markdown table
 python -m bd_usbench.scripts.compare --results-dir results
+
+# Bootstrap CIs, per-domain breakdowns, and cross-run oracle analysis
+python -m bd_usbench.scripts.analyze --results-dir results --out results/analysis
 ```
 
 `--domain fetal|adult|all` filters evaluation by domain. Evaluation writes to
@@ -103,8 +106,15 @@ python -m bd_usbench.scripts.compare --results-dir results
 per-class precision/recall, ECE, mean per-image latency on the current device),
 `summary.md`, `confusion_matrix.png`, `reliability_diagram.png` (when real
 probabilities exist — the generative Qwen path produces hard predictions, so
-ECE is reported as `n/a` there), and `unparsed.csv` logging any VLM outputs
-that could not be mapped to a class (they count as errors).
+ECE is reported as `n/a` there), `predictions.csv` (one row per image:
+filename, patient_id, domain, true/pred label, confidence, correct — plus the
+raw model answer for generative VLMs), and `unparsed.csv` logging any VLM
+outputs that could not be mapped to a class (they count as errors).
+`scripts.analyze` reads all `predictions.csv` files and writes
+`results/analysis/analysis.md` + `analysis.json` with bootstrap 95% CIs,
+fetal/adult breakdowns, per-class tables, oracle tables for every pair of
+runs, the images every run gets wrong, and the images only the LoRA model
+gets right; `scripts.compare` then shows a CI column.
 
 ## Running on Kaggle
 

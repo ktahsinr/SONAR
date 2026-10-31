@@ -1,8 +1,9 @@
 """Per-track prediction runners and the shared evaluate() entry point.
 
 ``evaluate(track, cfg, split, domain)`` writes to results/<run_name>/eval_<split>_<domain>/:
-metrics.json, summary.md, confusion_matrix.png, reliability_diagram.png (when
-real probabilities exist), and unparsed.csv for generative VLM failures.
+metrics.json, summary.md, predictions.csv (one row per image, dataset order),
+confusion_matrix.png, reliability_diagram.png (when real probabilities exist),
+and unparsed.csv for generative VLM failures.
 """
 
 from __future__ import annotations
@@ -14,7 +15,7 @@ import pandas as pd
 import torch
 from torch.utils.data import DataLoader
 
-from bd_usbench.data.dataset import UltrasoundDataset, load_classes
+from bd_usbench.data.dataset import UltrasoundDataset
 from bd_usbench.data.transforms import build_transforms
 from bd_usbench.eval.latency import measure_latency
 from bd_usbench.eval.metrics import (
@@ -48,10 +49,16 @@ def _dataset(cfg: dict, classes: list[str], split: str, domain: str, with_transf
     )
 
 
+def _meta_rows(ds: UltrasoundDataset) -> pd.DataFrame:
+    """Per-image metadata (filename, patient_id, domain) in dataset order."""
+    return ds.df[["filename", "patient_id", "domain"]].reset_index(drop=True).copy()
+
+
 def predictions_track_a(
     cfg: dict, classes: list[str], split: str, domain: str
-) -> tuple[np.ndarray, np.ndarray, np.ndarray | None, dict]:
-    """Run the trained supervised classifier; returns (y_true, y_pred, probs, latency)."""
+) -> tuple[np.ndarray, np.ndarray, np.ndarray | None, dict, pd.DataFrame]:
+    """Run the trained supervised classifier; returns (y_true, y_pred, probs,
+    latency, per-image metadata)."""
     device = resolve_device(cfg.get("device", "auto"))
     checkpoint = cfg.get("eval", {}).get("checkpoint") or str(
         Path(cfg["output"]["dir"]) / cfg["run_name"] / "checkpoints" / "best.pt"
@@ -82,18 +89,20 @@ def predictions_track_a(
     sample = sample.unsqueeze(0).to(device)
     with torch.no_grad():
         latency = measure_latency(lambda: model(sample))
-    return np.array(y_true), y_pred, probs, latency
+    return np.array(y_true), y_pred, probs, latency, _meta_rows(ds)
 
 
 def predictions_track_b(
     cfg: dict, classes: list[str], split: str, domain: str
-) -> tuple[np.ndarray, np.ndarray, np.ndarray | None, dict, list[dict]]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray | None, dict, list[dict], pd.DataFrame, list[str] | None]:
     """Zero-shot VLM predictions. CLIP yields real probabilities; generative
-    Qwen yields hard predictions (probs=None) plus a log of unparseable outputs."""
+    Qwen yields hard predictions (probs=None), the raw per-image answers, and a
+    log of unparseable outputs."""
     ds = _dataset(cfg, classes, split, domain, with_transform=False)
     y_true = np.array([ds.label_index(i) for i in range(len(ds))])
     vlm_type = cfg["model"].get("type", "clip")
     unparsed: list[dict] = []
+    meta = _meta_rows(ds)
 
     if vlm_type == "clip":
         from bd_usbench.models.vlm.clip_zeroshot import ClipZeroShot
@@ -105,7 +114,7 @@ def predictions_track_b(
         probs = np.stack([clip.predict(ds.image_path(i)).numpy() for i in range(len(ds))])
         y_pred = probs.argmax(axis=1)
         latency = measure_latency(lambda: clip.predict(ds.image_path(0)), n_runs=10)
-        return y_true, y_pred, probs, latency, unparsed
+        return y_true, y_pred, probs, latency, unparsed, meta, None
 
     if vlm_type == "qwen":
         from bd_usbench.models.vlm.qwen import QwenVLM
@@ -116,8 +125,10 @@ def predictions_track_b(
             adapter_path=cfg["model"].get("adapter_path"),
         )
         y_pred = np.full(len(ds), -1, dtype=int)
+        raw_answers: list[str] = []
         for i in range(len(ds)):
             pred_class, raw = vlm.classify(ds.image_path(i), classes)
+            raw_answers.append(raw)
             if pred_class is None:
                 unparsed.append({"filename": str(ds.df.iloc[i]["filename"]), "raw_output": raw})
                 logger.warning("Unparseable VLM output for %s: %r", ds.image_path(i).name, raw)
@@ -126,14 +137,14 @@ def predictions_track_b(
         latency = measure_latency(
             lambda: vlm.classify(ds.image_path(0), classes), n_warmup=1, n_runs=5
         )
-        return y_true, y_pred, None, latency, unparsed
+        return y_true, y_pred, None, latency, unparsed, meta, raw_answers
 
     raise ValueError(f"Unknown VLM type {vlm_type!r} (clip|qwen)")
 
 
 def predictions_track_c(
     cfg: dict, classes: list[str], split: str, domain: str
-) -> tuple[np.ndarray, np.ndarray, np.ndarray | None, dict, list[dict]]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray | None, dict, list[dict], pd.DataFrame, list[str] | None]:
     """Track C = Track B's Qwen path with the trained LoRA adapter attached."""
     cfg = dict(cfg)
     model_cfg = dict(cfg["model"])
@@ -146,20 +157,32 @@ def predictions_track_c(
 
 
 def evaluate(track: str, cfg: dict, split: str = "test", domain: str = "all") -> dict:
-    """Shared evaluation entry point for all tracks; writes the results folder."""
+    """Shared evaluation entry point for all tracks; writes the results folder.
+
+    classes.json is loaded if present, otherwise rebuilt from metadata.csv (same
+    deterministic recipe as training), so evaluation can run against results/
+    copied in from a previous session without retraining.
+    """
     set_seed(int(cfg.get("seed", 42)))
-    classes = load_classes(cfg["data"]["classes_json"])
+    from bd_usbench.train.trainer import resolve_class_list  # avoid import cycle
+
+    classes = resolve_class_list(cfg)
     out_dir = ensure_dir(
         Path(cfg["output"]["dir"]) / cfg["run_name"] / f"eval_{split}_{domain}"
     )
 
     unparsed: list[dict] = []
+    raw_answers: list[str] | None = None
     if track == "a":
-        y_true, y_pred, probs, latency = predictions_track_a(cfg, classes, split, domain)
+        y_true, y_pred, probs, latency, meta = predictions_track_a(cfg, classes, split, domain)
     elif track == "b":
-        y_true, y_pred, probs, latency, unparsed = predictions_track_b(cfg, classes, split, domain)
+        y_true, y_pred, probs, latency, unparsed, meta, raw_answers = predictions_track_b(
+            cfg, classes, split, domain
+        )
     elif track == "c":
-        y_true, y_pred, probs, latency, unparsed = predictions_track_c(cfg, classes, split, domain)
+        y_true, y_pred, probs, latency, unparsed, meta, raw_answers = predictions_track_c(
+            cfg, classes, split, domain
+        )
     else:
         raise ValueError(f"Unknown track {track!r} (a|b|c)")
 
@@ -184,6 +207,9 @@ def evaluate(track: str, cfg: dict, split: str = "test", domain: str = "all") ->
     if unparsed:
         pd.DataFrame(unparsed).to_csv(out_dir / "unparsed.csv", index=False)
 
+    _write_predictions_csv(
+        out_dir / "predictions.csv", meta, y_true, y_pred, probs, classes, raw_answers
+    )
     save_json(metrics, out_dir / "metrics.json")
     _write_summary_md(metrics, out_dir / "summary.md")
     logger.info(
@@ -191,6 +217,33 @@ def evaluate(track: str, cfg: dict, split: str = "test", domain: str = "all") ->
         track, split, domain, metrics["accuracy"], metrics["macro_f1"], out_dir,
     )
     return metrics
+
+
+def _write_predictions_csv(
+    path: Path,
+    meta: pd.DataFrame,
+    y_true: np.ndarray,
+    y_pred: np.ndarray,
+    probs: np.ndarray | None,
+    classes: list[str],
+    raw_answers: list[str] | None,
+) -> None:
+    """One row per image, in dataset iteration order.
+
+    confidence is the max probability when real probabilities exist, empty
+    otherwise (generative VLMs). pred_label is empty for unparseable outputs
+    (y_pred == -1). raw_answer is only written for generative VLMs.
+    """
+    rows = meta.copy()
+    rows["true_label"] = [classes[int(i)] for i in y_true]
+    rows["pred_label"] = [classes[int(i)] if int(i) >= 0 else "" for i in y_pred]
+    rows["confidence"] = (
+        probs.max(axis=1) if probs is not None and len(probs) else [""] * len(rows)
+    )
+    rows["correct"] = [bool(t == p) for t, p in zip(y_true, y_pred)]
+    if raw_answers is not None:
+        rows["raw_answer"] = raw_answers
+    rows.to_csv(path, index=False)
 
 
 def _write_summary_md(metrics: dict, path: Path) -> None:
